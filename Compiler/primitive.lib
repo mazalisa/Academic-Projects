@@ -1,0 +1,1766 @@
+/*  apply , CHECK APPEND*/
+
+L_append:
+	PUSH(FP);
+	MOV(FP, SP);
+	//PUSHA();
+	SHOW("HI", FPARG(1));
+	MOV(R1, FPARG(1));
+	CMP(R1, IMM(0)); 
+	JUMP_LT (L_invalid_num_args);
+	CMP(R1, IMM(0)); 
+	JUMP_EQ (L_append_nil);
+	MOV(R15, IMM(2)); 
+	DECR(R1); 
+	JUMP(L_append_check_loop); 
+L_append_check_loop: 
+	CMP(R1, IMM(0));
+	JUMP_EQ(L_append_append);
+	MOV(R3, FPARG(R15));
+	JUMP(L_append_curr_loop); 
+L_append_curr_loop:
+	CMP(INDD(R3, 0), T_PAIR);
+	JUMP_EQ(L_append_curr_next);
+	CMP(INDD(R3, 0), T_NIL);
+	JUMP_NE(L_not_list);
+	JUMP(L_append_lists_next);
+L_append_curr_next:
+	MOV(R3, INDD(R3, 2)); 
+	JUMP(L_append_curr_loop);
+L_append_lists_next:
+	DECR(R1);
+	INCR(R15);
+	JUMP(L_append_check_loop);
+L_append_append:
+	MOV(R1, FPARG(1)); //num of args
+	MOV(R15, IMM(2)); //first arg
+	DECR(R1); 
+	MOV(R6, IMM(0)); 
+	JUMP(L_append_curr_list_loop);
+L_append_curr_list_loop:  
+	CMP(R1, IMM(0)); 
+	JUMP_EQ(L_append_last_create);
+	MOV(R3, FPARG(R15));
+	JUMP(L_append_args_list);
+L_append_args_list:
+	CMP(INDD(R3, 0), T_PAIR);
+	JUMP_EQ(L_append_args_list_next);
+	CMP(INDD(R3, 0), T_NIL);
+	JUMP_EQ(L_append_list_next_next);
+	JUMP(L_not_list);
+L_append_args_list_next:
+	PUSH(INDD(R3, 1)); 
+	INCR(R6);
+	MOV(R3, INDD(R3, 2));
+	JUMP(L_append_args_list);
+L_append_list_next_next:
+	DECR(R1); 
+	INCR(R15);
+	JUMP(L_append_curr_list_loop);
+L_append_last_create:
+	PUSH(R6);
+	PUSH(FPARG(0));
+	CALL(L_list);
+	DROP(R6+2);
+	MOV(R3, R0); //R0 - The rev list
+	MOV(R0, FPARG(R15)); // last arg in R0
+	JUMP(L_append_rev_list_loop);
+L_append_rev_list_loop:
+	CMP(INDD(R3, 0), T_PAIR);
+	JUMP_EQ(L_append_rev_list_next);
+	CMP(INDD(R3, 0), T_NIL);
+	JUMP_EQ(L_append_end);
+	JUMP(L_not_list);
+L_append_rev_list_next:
+	PUSH(R0);
+	PUSH(INDD(R3, 1));
+	PUSH(IMM(2));
+	PUSH(FPARG(0));
+	CALL(L_cons); /* create a new pair */
+	DROP(IMM(4));
+	MOV(R3, INDD(R3, 2));
+	JUMP(L_append_rev_list_loop);
+L_append_nil:
+	MOV(R0, IMM(1000));
+	JUMP(L_append_end);
+L_append_end:
+	//POPA();
+	POP(FP);
+	RETURN;
+ 
+L_greater:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1)); //R1 - num of args
+	CMP(FPARG(1),IMM(1));
+	JUMP_LT(L_invalid_num_args);
+	MOV(R0, IMM(1002));
+	CMP(FPARG(1), IMM(1));
+	JUMP_EQ(L_greater_end);
+	MOV(R15, IMM(2)); //R2 - pointer to current arg
+	//R15 - counter of FPARG
+	MOV(R7, FPARG(R15)); //R7 - me
+	CMP(IND(R7), T_INTEGER);
+	JUMP_EQ(L_greater_make_int);
+	CMP(IND(R7), T_FRACTION);
+	JUMP_EQ(L_greater_make_fraction);
+	JUMP(L_invalid_types);
+L_greater_make_int:
+	MOV(R7, INDD(R7, 1)); //R7 - numerator of current
+	MOV(R8, IMM(1));      //R8 - denomerator of current
+	INCR(R15);
+	DECR(R1);
+	JUMP(L_greater_check);
+L_greater_make_fraction:
+	MOV(R8, INDD(R7, 2)); //R8 - denomerator of current
+	MOV(R7, INDD(R7, 1)); //R7 - numerator of current
+	INCR(R15);
+	DECR(R1);
+L_greater_check:
+	CMP(R1, IMM(0));
+	JUMP_EQ(L_greater_end);
+	MOV(R4, FPARG(R15)); //R4 - current arg
+	CMP(IND(R4), T_INTEGER);
+	JUMP_EQ(L_greater_next_int);
+	CMP(IND(R4), T_FRACTION);
+	JUMP_EQ(L_greater_next_fraction);
+	JUMP(L_invalid_types);
+L_greater_next_int:
+	MOV(R13, INDD(R4, 1)); //R13 - numerator of next
+	MOV(R14, IMM(1));      //R14 - denomerator of next
+	JUMP(L_greater_compare);
+L_greater_next_fraction:
+	MOV(R13, INDD(R4, 1)); //R13 - numerator of next
+	MOV(R14, INDD(R4, 2)); //R14 - denomerator of next
+	JUMP(L_greater_compare);
+L_greater_compare:	
+	MOV(R5, R7);
+	DIV(R5, R8);
+	MOV(R6, R13);
+	DIV(R6, R14);
+	CMP(R5, R6);
+	JUMP_LT(L_greater_false);
+	CMP(R5, R6);
+	JUMP_GT(L_greater_f_f_end);
+	MOV(R5, R7);
+	REM(R5, R8);
+	MOV(R6, R13);
+	REM(R6, R14);
+	CMP(R5, R6);
+	JUMP_LT(L_greater_false);
+	CMP(R5, R6);
+	JUMP_GT(L_greater_f_f_end);
+	CMP(R7, IMM(0));
+	JUMP_EQ(L_greater_zero_7);
+	CMP(R13, IMM(0));
+	JUMP_EQ(L_greater_zero_13);
+	MOV(R5, R8);
+	DIV(R5, R7);
+	MOV(R6, R14);
+	DIV(R6, R13);
+	CMP(R5, R6);
+	JUMP_GE(L_greater_false);
+L_greater_f_f_end:
+	MOV(R7, R13);
+	MOV(R8, R14);
+	INCR(R15);
+	DECR(R1);
+	JUMP(L_greater_check);
+L_greater_zero_7:
+	CMP(R13, IMM(0));
+	JUMP_EQ(L_greater_false);
+	JUMP(L_greater_end);
+L_greater_zero_13:
+	CMP(R7, IMM(0));
+	JUMP_EQ(L_greater_false);
+L_greater_end:
+	POP(FP);
+	RETURN;
+L_greater_false:
+	MOV(R0, IMM(1004));
+	JUMP(L_greater_end);
+
+L_equal:
+	PUSH(FP);
+	MOV(FP, SP);
+	//PUSHA();
+	MOV(R1, FPARG(1)); //R1 - num of args
+	CMP(FPARG(1),IMM(1));
+	JUMP_LT(L_invalid_num_args);
+	MOV(R0, IMM(1002));
+	CMP(FPARG(1), IMM(1));
+	JUMP_EQ(L_equal_end);
+	MOV(R15, IMM(2)); //R2 - pointer to current arg
+	//R15 - counter of FPARG
+	MOV(R7, FPARG(R15)); //R7 - me
+	CMP(IND(R7), T_INTEGER);
+	JUMP_EQ(L_equal_make_int);
+	CMP(IND(R7), T_FRACTION);
+	JUMP_EQ(L_equal_make_fraction);
+	JUMP(L_invalid_types);
+L_equal_make_int:
+	MOV(R7, INDD(R7, 1)); //R7 - numerator of current
+	MOV(R8, IMM(1));      //R8 - denomerator of current
+	INCR(R15);
+	DECR(R1);
+	JUMP(L_equal_check);
+L_equal_make_fraction:
+	MOV(R8, INDD(R7, 2)); //R8 - denomerator of current
+	MOV(R7, INDD(R7, 1)); //R7 - numerator of current
+	INCR(R15);
+	DECR(R1);
+L_equal_check:
+	CMP(R1, IMM(0));
+	JUMP_EQ(L_equal_end);
+	MOV(R4, FPARG(R15)); //R4 - current arg
+	CMP(IND(R4), T_INTEGER);
+	JUMP_EQ(L_equal_next_int);
+	CMP(IND(R4), T_FRACTION);
+	JUMP_EQ(L_equal_next_fraction);
+	JUMP(L_invalid_types);
+L_equal_next_int:
+	MOV(R13, INDD(R4, 1)); //R13 - numerator of next
+	MOV(R14, IMM(1));      //R14 - denomerator of next
+	JUMP(L_equal_compare);
+L_equal_next_fraction:
+	MOV(R13, INDD(R4, 1)); //R13 - numerator of next
+	MOV(R14, INDD(R4, 2)); //R14 - denomerator of next
+	JUMP(L_equal_compare);
+L_equal_compare:	
+	MOV(R5, R7);
+	DIV(R5, R8);
+	MOV(R6, R13);
+	DIV(R6, R14);
+	CMP(R5, R6);
+	JUMP_NE(L_equal_false);
+	MOV(R5, R7);
+	REM(R5, R8);
+	MOV(R6, R13);
+	REM(R6, R14);
+	CMP(R5, R6);
+	JUMP_NE(L_equal_false);
+	CMP(R7, IMM(0));
+	JUMP_EQ(L_check_equal_zero_7);
+	CMP(R13, IMM(0));
+	JUMP_EQ(L_check_equal_zero_13);
+	MOV(R5, R8);
+	DIV(R5, R7);
+	MOV(R6, R14);
+	DIV(R6, R13);
+	CMP(R5, R6);
+	JUMP_NE(L_equal_false);
+L_equal_f_f_end:
+	MOV(R7, R13);
+	MOV(R8, R14);
+	INCR(R15);
+	DECR(R1);
+	JUMP(L_equal_check);
+L_check_equal_zero_7:
+	CMP(R13, IMM(0));
+	JUMP_NE(L_equal_false);
+	JUMP(L_equal_end);
+L_check_equal_zero_13:
+	CMP(R7, IMM(0));
+	JUMP_NE(L_equal_false);
+L_equal_end:
+	//POPA();
+	POP(FP);
+	RETURN;
+L_equal_false:
+	MOV(R0, IMM(1004));
+	JUMP(L_equal_end);
+	
+L_lower:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1)); //R1 - num of args
+	CMP(FPARG(1),IMM(1));
+	JUMP_LT(L_invalid_num_args);
+	MOV(R0, IMM(1002));
+	CMP(FPARG(1), IMM(1));
+	JUMP_EQ(L_lower_end);
+	MOV(R15, IMM(2)); //R2 - pointer to current arg
+	//R15 - counter of FPARG
+	MOV(R7, FPARG(R15)); //R7 - me
+	CMP(IND(R7), T_INTEGER);
+	JUMP_EQ(L_lower_make_int);
+	CMP(IND(R7), T_FRACTION);
+	JUMP_EQ(L_lower_make_fraction);
+	JUMP(L_invalid_types);
+L_lower_make_int:
+	MOV(R7, INDD(R7, 1)); //R7 - numerator of current
+	MOV(R8, IMM(1));      //R8 - denomerator of current
+	INCR(R15);
+	DECR(R1);
+	JUMP(L_lower_check);
+L_lower_make_fraction:
+	MOV(R8, INDD(R7, 2)); //R8 - denomerator of current
+	MOV(R7, INDD(R7, 1)); //R7 - numerator of current
+	INCR(R15);
+	DECR(R1);
+L_lower_check:
+	CMP(R1, IMM(0));
+	JUMP_EQ(L_lower_end);
+	MOV(R4, FPARG(R15)); //R4 - current arg
+	CMP(IND(R4), T_INTEGER);
+	JUMP_EQ(L_lower_next_int);
+	CMP(IND(R4), T_FRACTION);
+	JUMP_EQ(L_lower_next_fraction);
+	JUMP(L_invalid_types);
+L_lower_next_int:
+	MOV(R13, INDD(R4, 1)); //R13 - numerator of next
+	MOV(R14, IMM(1));      //R14 - denomerator of next
+	JUMP(L_lower_compare);
+L_lower_next_fraction:
+	MOV(R13, INDD(R4, 1)); //R13 - numerator of next
+	MOV(R14, INDD(R4, 2)); //R14 - denomerator of next
+	JUMP(L_lower_compare);
+L_lower_compare:
+	MOV(R5, R7);
+	DIV(R5, R8);
+	MOV(R6, R13);
+	DIV(R6, R14);
+	CMP(R5, R6);
+	JUMP_GT(L_lower_false);
+	CMP(R5, R6);
+	JUMP_LT(L_lower_f_f_end);
+	MOV(R5, R7);
+	REM(R5, R8);
+	MOV(R6, R13);
+	REM(R6, R14);
+	CMP(R5, R6);
+	JUMP_GT(L_lower_false);
+	CMP(R5, R6);
+	JUMP_LT(L_lower_f_f_end);
+	CMP(R7, IMM(0));
+	JUMP_EQ(L_lower_zero_7);
+	CMP(R13, IMM(0));
+	JUMP_EQ(L_lower_zero_13);
+	MOV(R5, R8);
+	DIV(R5, R7);
+	MOV(R6, R14);
+	DIV(R6, R13);
+	CMP(R5, R6);
+	JUMP_LE(L_lower_false);
+L_lower_f_f_end:
+	MOV(R7, R13);
+	MOV(R8, R14);
+	INCR(R15);
+	DECR(R1);
+	JUMP(L_lower_check);
+L_lower_zero_7:
+	CMP(R13, IMM(0));
+	JUMP_EQ(L_lower_false);
+	JUMP(L_lower_end);
+L_lower_zero_13:
+	CMP(R7, IMM(0));
+	JUMP_EQ(L_lower_false);
+L_lower_end:
+	POP(FP);
+	RETURN;
+L_lower_false:
+	MOV(R0, IMM(1004));
+	JUMP(L_lower_end);
+	
+L_apply:
+  	PUSH(FP);
+ 	MOV(FP, SP);
+ 	MOV(R1, FPARG(1));
+ 	CMP(R1, IMM(2)); 		
+ 	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2)); 
+	CMP(INDD(R1, 0), T_CLOSURE); 
+	JUMP_NE(L_not_proc);
+	PUSH(R1);
+	MOV(R3, FPARG(3));
+	MOV(R6, IMM(0)); 	
+L_apply_list_loop:	
+	CMP(INDD(R3, 0), T_PAIR);
+	JUMP_EQ(L_apply_list_loop_end); 
+	CMP(INDD(R3, 0), T_NIL);
+	JUMP_EQ(L_apply_list_rev); 
+	JUMP(L_not_list);
+L_apply_list_loop_end:
+	PUSH(INDD(R3, 1)); 
+	INCR(R6);
+	MOV(R3, INDD(R3, 2));
+	JUMP(L_apply_list_loop);
+L_apply_list_rev:
+	PUSH(R6); 
+	PUSH(FPARG(0));
+	CALL(L_list);
+	DROP(R6+2);
+	POP(R1);
+	MOV(R3, R0); 
+L_apply_args_loop:
+	CMP(INDD(R3, 0), T_PAIR);
+	JUMP_EQ(L_apply_args_loop_sec);
+	CMP(INDD(R3, 0), T_NIL);
+	JUMP_EQ(L_apply_args_loop_end);
+	JUMP(L_not_list);
+L_apply_args_loop_sec:
+	PUSH(INDD(R3, 1));
+	MOV(R3, INDD(R3, 2));
+	JUMP(L_apply_args_loop);
+L_apply_args_loop_end:
+	PUSH(R6);
+	//ApplicTP
+	PUSH(INDD(R1, 1));
+	PUSH(FPARG(-1));
+	MOV(R14, SP);
+	MOV(R15, FP);
+	SUB(R14, R15); 
+	MOV(R10, FPARG(1));
+	MOV(FP, FPARG(-2));
+	MOV(R9, R15);
+	SUB(R9, R10);
+	SUB(R9, IMM(4));
+	MOV(R13, IMM(0));
+L_apply_apply_loop:
+	CMP(R13, R14);
+	JUMP_EQ(L_apply_apply_loop_end);
+	MOV (STACK(R9+R13), STACK(R15+R13));
+	INCR(R13);
+	JUMP (L_apply_apply_loop);
+L_apply_apply_loop_end:
+	DROP(R10+4);
+	MOV(R4, INDD(R1, 2));  
+	JUMPA(R4);
+	
+L_map_reg:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R6, FPARG(1));
+	CMP(R6, IMM(2));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R6, FPARG(2));
+	MOV(R4, IND(R6));
+	CMP(R4, T_CLOSURE);
+	JUMP_NE(L_not_proc);
+	MOV(R11, FPARG(3));
+	MOV(R5, R11); //R5 - The wanna be list
+ 	CMP(R5, IMM(1000));
+ 	JUMP_EQ(L_map_map_nil);
+L_check_lst:
+	MOV(R13, R5);
+	CMP(R13, IMM(1000));
+	JUMP_EQ(L_check_lst_succ);
+	MOV(R13, IND(R5));
+	CMP(R13, T_PAIR);
+	JUMP_NE(L_not_list);
+	MOV(R5, INDD(R5, 2));
+	JUMP(L_check_lst);
+L_check_lst_succ:
+	//R0 - pair
+	MOV(R7, INDD(R11, 1));
+	PUSH(R11);
+	PUSH(R7);
+	PUSH(IMM(1));
+	PUSH(INDD(R6, 1));
+	CALLA(INDD(R6, 2));
+	DROP(2+STARG(0));
+	POP(R11);
+	//DROP(3); 
+	//R0 - Result of func on list item
+	MOV(R10, R0); //R10 - Result of func on list item
+	PUSH(IMM(1000));
+	PUSH(R10);
+	CALL(MAKE_SOB_PAIR);
+	DROP(2);
+	MOV(R8, R0); //R8 - new list addr
+	MOV(R9, R8);	
+	//MOV(R9, INDD(R9, 2));
+	MOV(R11, INDD(R11, 2));
+L_map_map_loop:
+	CMP(R11, IMM(1000));
+	JUMP_EQ(L_map_map_loop_end);
+	MOV(R7, INDD(R11, 1));
+	PUSH(R9);
+	PUSH(R8);
+	PUSH(R11);
+	PUSH(R7);
+	PUSH(IMM(1));
+	PUSH(INDD(R6, 1));
+	CALLA(INDD(R6, 2));
+	DROP(2+STARG(0));
+	POP(R11);
+	POP(R8);
+	POP(R9);
+	//R0 - Result of func on list item
+	//MOV(R8, R0);
+		
+	PUSH(IMM(1000));
+	PUSH(R0);
+	CALL(MAKE_SOB_PAIR);
+	DROP(2);
+	MOV(INDD(R9, 2), R0);
+	MOV(R9, R0);
+	MOV(R11, INDD(R11, 2));
+	JUMP(L_map_map_loop);
+L_map_map_loop_end:
+	MOV(R0, R8);
+	POP(FP);
+	RETURN;
+ L_map_map_nil:
+ 	MOV(R0, IMM(1000));
+ 	POP(FP);	
+ 	RETURN;
+
+L_remainder:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1));
+	CMP(R1, IMM(2));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	MOV(R2, FPARG(3));
+	MOV(R3, IND(R1));
+	MOV(R4, IND(R2));
+	CMP(R3, T_INTEGER);
+	JUMP_NE(L_not_integer);
+	CMP(R4, T_INTEGER);
+	JUMP_NE(L_not_integer);
+	MOV(R3, INDD(R1, 1));
+	MOV(R4, INDD(R2, 1));
+	REM(R3, R4);
+	MOV(R0, R3);
+	PUSH(R0);
+	CALL(MAKE_SOB_INTEGER);
+	DROP(1);
+	POP(FP);
+	RETURN;
+	
+L_eq:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1));
+	CMP(R1, IMM(2));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R0, IMM(1002));
+	MOV(R1, FPARG(2));
+	MOV(R2, FPARG(3));
+	MOV(R3, IND(R1));
+	MOV(R4, IND(R2));
+	CMP(R3, R4);
+	JUMP_NE(eq_false);
+	CMP(R3, T_VECTOR);
+	JUMP_EQ(eq_addresses);	
+	CMP(R3, T_PAIR);
+	JUMP_EQ(eq_addresses);
+	CMP(R3, T_CLOSURE);
+	JUMP_EQ(eq_addresses);
+	CMP(R3, T_SYMBOL);
+	JUMP_EQ(eq_symbol);
+	CMP(R3, T_STRING);
+	JUMP_EQ(eq_addresses);
+	CMP(R3, T_FRACTION);
+	JUMP_EQ(eq_fraction);
+	MOV(R5, INDD(R1, 1));
+	MOV(R6, INDD(R2, 1));
+	CMP(R5, R6);
+	JUMP_NE(eq_false);
+	JUMP(eq_end);
+eq_addresses:
+	CMP(R1, R2);
+	JUMP_NE(eq_false);
+	JUMP(eq_end);
+eq_fraction:
+	MOV(R5, INDD(R1, 1));
+	MOV(R6, INDD(R2, 1));
+	CMP(R5, R6);
+	JUMP_NE(eq_false);
+	MOV(R5, INDD(R1, 2));
+	MOV(R6, INDD(R2, 2));
+	CMP(R5, R6);
+	JUMP_NE(eq_false);
+	JUMP(eq_end);
+eq_symbol:
+	MOV(R5, INDD(R1, 1));
+	MOV(R6, INDD(R2, 1));
+	CMP(R5, R6);
+	JUMP_EQ(eq_end);
+eq_false:
+	MOV(R0, IMM(1004));
+eq_end:
+	POP(FP);
+	RETURN;
+
+L_numerator:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1));
+	CMP(R1, IMM(1));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	MOV(R2, INDD(R1, 0));
+	CMP(R2, T_FRACTION);
+	JUMP_EQ(L_numer_int_fraction);
+	CMP(R2, T_INTEGER);
+	JUMP_EQ(L_numer_int_fraction);
+	JUMP(L_invalid_types);
+L_numer_int_fraction:
+	MOV(R0, INDD(R1, 1));
+	PUSH(R0);
+	CALL(MAKE_SOB_INTEGER);
+	DROP(1);
+	POP(FP);
+	RETURN;
+	
+L_denominator:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1));
+	CMP(R1, IMM(1));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	MOV(R2, INDD(R1, 0));
+	CMP(R2, T_FRACTION);
+	JUMP_EQ(L_denom_fraction);
+	CMP(R2, T_INTEGER);
+	JUMP_EQ(L_denom_int);
+	JUMP(L_invalid_types);
+L_denom_int:
+	MOV(R0, IMM(1));
+	JUMP(L_denom_end);
+L_denom_fraction:
+	MOV(R0, INDD(R1, 2));
+L_denom_end:
+	PUSH(R0);
+	CALL(MAKE_SOB_INTEGER);
+	DROP(1);
+	POP(FP);
+	RETURN;
+	
+L_not:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1));
+	CMP(R1, IMM(1));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R2, FPARG(2));
+	MOV(R0, IMM(1002));
+	MOV(R3, IMM(1004));
+	CMP(R3, R2);
+	JUMP_EQ(L_return_true);
+	MOV(R0, IMM(1004));
+L_return_true:
+	POP(FP);
+	RETURN;
+
+L_string_symbol:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1));
+	CMP(R1, IMM(1));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	MOV(R2, INDD(R1, 0));
+	CMP(R2, T_STRING);
+	JUMP_NE(L_not_string);
+	//R1-address of the string
+	MOV(R11, R12);
+L_string_symbol_loop:
+	CMP(R11, IMM(1000));
+	JUMP_EQ(L_string_symbol_loop_end);
+	MOV(R10, IND(R11));
+	MOV(R9, INDD(R10, 1));
+	//deep eq here
+L_string_deep_eq:
+	//R9 - string on loop, R1 - string args
+	CMP(INDD(R9, 1), INDD(R1, 1)); //compare lengths
+	JUMP_NE(L_string_deep_loop_end);
+	MOV(R13, INDD(R9, 1));
+	MOV(R14, IMM(2));
+L_string_deep_loop:
+	CMP(R13, IMM(0));
+	JUMP_EQ(L_string_exists);
+	CMP(INDD(R9, R14), INDD(R1, R14)); //compare chars
+	JUMP_NE(L_string_deep_loop_end);
+	INCR(R14);
+	DECR(R13);
+	JUMP(L_string_deep_loop);
+L_string_deep_loop_end:
+	//CMP(R9, R1);
+	//JUMP_EQ(L_string_exists);
+	MOV(R11, INDD(R11, 1));
+	JUMP(L_string_symbol_loop);
+L_string_symbol_loop_end:
+	PUSH(IMM(2));
+	CALL(MALLOC);
+	DROP(1);
+	MOV(IND(R0), T_SYMBOL);
+	MOV(INDD(R0,1), R1);
+	MOV(R1, R0); //R1-address of symbol
+	PUSH(IMM(2));
+        CALL(MALLOC);
+        DROP(1);
+   	MOV(IND(R0),R1);
+   	MOV(INDD(R0,1),R12);
+   	MOV(R12, R0);
+	MOV(R0, R1);
+	JUMP(L_string_symbol_exit);
+L_string_exists:
+	MOV(R0, R10);	
+L_string_symbol_exit:
+	POP(FP);
+	RETURN;
+
+
+L_symbol_string:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1));
+	CMP(R1, IMM(1));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	MOV(R2, INDD(R1, 0));
+	CMP(R2, T_SYMBOL);
+	JUMP_NE(L_not_symbol);
+	MOV(R0, INDD(R1, 1));
+	POP(FP);
+	RETURN;
+
+L_display:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1));
+	CMP(R1, IMM(1));
+	JUMP_NE(L_invalid_num_args);
+	PUSH(FPARG(2));
+	CALL(WRITE_SOB);
+	DROP(1);
+	CALL(NEWLINE);
+	MOV(R0, IMM(1001));
+	POP(FP);
+	RETURN;
+	
+L_string_set:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1));
+	CMP(R1, IMM(3));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	MOV(R2, INDD(R1, 0));
+	CMP(R2, T_STRING);
+	JUMP_NE(L_not_string);
+	MOV(R3, FPARG(3));
+	MOV(R4, INDD(R3,0));
+	CMP(R4, T_INTEGER);
+	JUMP_NE(L_not_integer);
+	MOV(R5, INDD(R1, 1));
+	CMP(R5, INDD(R3, 1));
+	JUMP_LE(L_unbound_index);
+	MOV(R4, FPARG(4));
+	CMP(INDD(R4,0), T_CHAR);
+	JUMP_NE(L_not_char);
+	MOV(R6, INDD(R3, 1));
+	ADD(R6, IMM(2));
+	MOV(INDD(R1, R6), INDD(R4,1)); 
+	MOV(R0, IMM(1001));
+	POP(FP);
+	RETURN;
+
+L_vector_set:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1));
+	CMP(R1, IMM(3));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	MOV(R2, INDD(R1, 0));
+	CMP(R2, T_VECTOR);
+	JUMP_NE(L_not_vector);
+	MOV(R3, FPARG(3));
+	MOV(R4, INDD(R3,0));
+	CMP(R4, T_INTEGER);
+	JUMP_NE(L_not_integer);
+	MOV(R5, INDD(R1, 1));
+	CMP(R5, INDD(R3, 1));
+	JUMP_LE(L_unbound_index);
+	MOV(R4, FPARG(4));
+	MOV(R6, INDD(R3, 1));
+	ADD(R6, IMM(2));
+	MOV(INDD(R1, R6), R4); 
+	MOV(R0, IMM(1001));
+	POP(FP);
+	RETURN;
+	
+L_integer_char:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1));
+	CMP(R1, IMM(1));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	MOV(R2, INDD(R1,0));
+	CMP(R2, T_INTEGER);
+	JUMP_NE(L_not_integer);
+	MOV(R1, INDD(R1,1));
+	PUSH(R1);
+	CALL(MAKE_SOB_CHAR);
+	DROP(1);
+	POP(FP);
+	RETURN;
+	
+L_char_integer:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1));
+	CMP(R1, IMM(1));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	MOV(R2, INDD(R1,0));
+	CMP(R2, T_CHAR);
+	JUMP_NE(L_not_char);
+	MOV(R1, INDD(R1,1));
+	PUSH(R1);
+	CALL(MAKE_SOB_INTEGER);
+	DROP(1);
+	POP(FP);
+	RETURN;
+
+
+L_set_car:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1));
+	CMP(R1, IMM(2));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	MOV(R3, INDD(R1,0));
+	CMP(R3, T_PAIR);
+	JUMP_NE(L_not_pair);
+	//MOV(R1, INDD(R1,1));
+	MOV(R2, FPARG(3));
+	MOV(INDD(R1,1), R2);
+	MOV(R0, IMM(1001));
+	POP(FP);
+	RETURN;
+	
+L_set_cdr:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1));
+	CMP(R1, IMM(2));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	MOV(R3, INDD(R1,0));
+	CMP(R3, T_PAIR);
+	JUMP_NE(L_not_pair);
+	//MOV(R1, INDD(R1,1));
+	MOV(R2, FPARG(3));
+	MOV(INDD(R1,2), R2);
+	MOV(R0, IMM(1001));
+	POP(FP);
+	RETURN;
+
+L_list:
+	PUSH(FP);
+	MOV(FP, SP);
+	//PUSHA();
+	MOV(R1, FPARG(1));
+	CMP(R1, IMM(0));
+	JUMP_EQ(L_list_end_no_arg);
+	CMP(R1, IMM(1));
+	JUMP_EQ(L_list_one_arg);
+	MOV(R2, IMM(1));
+	ADD(R2, R1);
+	MOV(R0, IMM(1000));
+	PUSH(R0);
+	PUSH(FPARG(R2));
+	CALL(MAKE_SOB_PAIR)
+	DROP(2);
+	DECR(R2);
+L_list_loop:
+	CMP(R2, IMM(1));
+	JUMP_EQ(L_list_loop_end);
+	MOV(R4, FPARG(R2));
+	PUSH(R0);
+	PUSH(R4);
+	CALL(MAKE_SOB_PAIR);
+	DROP(2);
+	DECR(R2);
+	JUMP(L_list_loop);
+L_list_loop_end:
+	//POPA();
+	POP(FP);
+	RETURN;
+L_list_end_no_arg:
+	MOV(R0, IMM(1000));
+	//POPA();
+	POP(FP);
+	RETURN;
+L_list_one_arg:
+	MOV(R1, FPARG(2));
+	MOV(R2, IMM(1000));
+	PUSH(R2);
+	PUSH(R1);
+	CALL(MAKE_SOB_PAIR);
+	DROP(2);
+	//POPA();
+	POP(FP);
+	RETURN;
+
+L_string_ref:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1));
+	CMP(R1, IMM(2));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	MOV(R2, INDD(R1, 0));
+	CMP(R2, T_STRING);
+	JUMP_NE(L_not_string);
+	MOV(R3, FPARG(3));
+	MOV(R4, INDD(R3,0));
+	CMP(R4, T_INTEGER);
+	JUMP_NE(L_not_integer);
+	MOV(R5, INDD(R1, 1));
+	CMP(R5, INDD(R3, 1));
+	JUMP_LE(L_unbound_index);
+	MOV(R4, INDD(R3, 1));
+	ADD(R4, IMM(2));
+	MOV(R0, INDD(R1, R4)); 
+	PUSH(R0);
+	CALL(MAKE_SOB_CHAR);
+	DROP(1);
+	POP(FP);
+	RETURN;
+
+L_vector_ref:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1));
+	CMP(R1, IMM(2));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	MOV(R2, INDD(R1, 0));
+	CMP(R2, T_VECTOR);
+	JUMP_NE(L_not_vector);
+	MOV(R3, FPARG(3));
+	MOV(R4, INDD(R3,0));
+	CMP(R4, T_INTEGER);
+	JUMP_NE(L_not_integer);
+	MOV(R5, INDD(R1, 1));
+	CMP(R5, INDD(R3, 1));
+	JUMP_LE(L_unbound_index);
+	MOV(R4, INDD(R3, 1));
+	ADD(R4, IMM(2));
+	MOV(R0, INDD(R1, R4)); 
+	POP(FP);
+	RETURN;
+
+L_string_length:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1));
+	CMP(R1, IMM(1));
+	JUMP_GT(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	MOV(R2, INDD(R1, 0));
+	CMP(R2, T_STRING);
+	JUMP_NE(L_not_string);
+	MOV(R0, INDD(R1, 1));
+	PUSH(R0);
+	CALL(MAKE_SOB_INTEGER);
+	DROP(1);
+	POP(FP);
+	RETURN;
+	
+L_vector_length:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1));
+	CMP(R1, IMM(1));
+	JUMP_GT(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	MOV(R2, INDD(R1, 0));
+	CMP(R2, T_VECTOR);
+	JUMP_NE(L_not_vector);
+	MOV(R0, INDD(R1, 1));
+	PUSH(R0);
+	CALL(MAKE_SOB_INTEGER);
+	DROP(1);
+	POP(FP);
+	RETURN;
+	
+L_vector_init:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1));
+	MOV(R3, R1);
+	MOV(R2, IMM(2));
+L_vector_loop:
+	CMP(R1, IMM(0));
+	JUMP_EQ(L_vector_loop_end);
+	PUSH(FPARG(R2));
+	INCR(R2);
+	DECR(R1);
+	JUMP(L_vector_loop);
+L_vector_loop_end:
+	PUSH(R3);
+	CALL(MAKE_SOB_VECTOR);
+	ADD(R3, IMM(1));
+	DROP(R3);
+	POP(FP);
+	RETURN;
+
+L_make_string:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1));
+	CMP(R1, IMM(1));
+	JUMP_EQ(L_make_string_fixed);
+	CMP(R1, IMM(2));
+	JUMP_GT(L_invalid_num_args);
+	MOV(R2, FPARG(3));
+	MOV(R2, INDD(R2,1));
+	MOV(R3, FPARG(2));
+	MOV(R4, INDD(R3,1));
+	MOV(R3, R4);
+	MOV(R5, R3); //R5 - NUMBER TO CREATE
+L_make_string_loop:
+	CMP(R3, IMM(0));
+	JUMP_EQ(L_make_string_loop_end);
+	PUSH(R2);
+	DECR(R3);
+	JUMP(L_make_string_loop);
+L_make_string_loop_end:
+	PUSH(R4);
+	CALL(MAKE_SOB_STRING);
+	ADD(R5, IMM(1));
+	DROP(R5);
+	POP(FP);
+	RETURN;
+L_make_string_fixed:
+	MOV(R3, FPARG(2));
+	MOV(R4, INDD(R3,1));
+	MOV(R3, R4);
+	MOV(R5, R3); //R5 - NUMBER TO CREATE
+	MOV(R2, IMM('\0'));
+L_make_string_fixed_loop:
+	CMP(R3, IMM(0));
+	JUMP_EQ(L_make_string_fixed_loop_end);
+	PUSH(R2);
+	DECR(R3);
+	JUMP(L_make_string_fixed_loop);
+L_make_string_fixed_loop_end:
+	PUSH(R4);
+	CALL(MAKE_SOB_STRING);
+	ADD(R5, IMM(1));
+	DROP(R5);
+	POP(FP);
+	RETURN;
+
+L_make_vector:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1));
+	CMP(R1, IMM(1));
+	JUMP_EQ(L_make_vector_fixed);
+	CMP(R1, IMM(2));
+	JUMP_GT(L_invalid_num_args);
+	MOV(R2, FPARG(3));
+	MOV(R3, FPARG(2));
+	MOV(R4, INDD(R3,1));
+	MOV(R3, R4);
+L_make_vector_loop:
+	CMP(R3, IMM(0));
+	JUMP_EQ(L_make_vector_loop_end);
+	PUSH(R2);
+	DECR(R3);
+	JUMP(L_make_vector_loop);
+L_make_vector_loop_end:
+	PUSH(R4);
+	CALL(MAKE_SOB_VECTOR);
+	ADD(R4, IMM(1));
+	DROP(R4);
+	POP(FP);
+	RETURN;
+L_make_vector_fixed:
+	MOV(R3, FPARG(2));
+	MOV(R4, INDD(R3,1));
+	MOV(R3, R4);
+	PUSH(IMM(0));
+	CALL(MAKE_SOB_INTEGER);
+	DROP(1);
+	MOV(R2, R0);
+L_make_vector_fixed_loop:
+	CMP(R3, IMM(0));
+	JUMP_EQ(L_make_vector_fixed_loop_end);
+	PUSH(R2);
+	DECR(R3);
+	JUMP(L_make_vector_fixed_loop);
+L_make_vector_fixed_loop_end:
+	PUSH(R4);
+	CALL(MAKE_SOB_VECTOR);
+	ADD(R4, IMM(1));
+	DROP(R4);
+	POP(FP);
+	RETURN;
+	
+L_zero:
+	PUSH(FP);
+	MOV(FP, SP);
+	CMP(FPARG(1),IMM(1));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));/*
+	CMP(INDD(R1,0), T_INTEGER);
+	JUMP_NE(L_not_integer);*/
+	CMP(INDD(R1,1), IMM(0));
+	JUMP_EQ(L_zero_true);
+	MOV(R0, IMM(1004));
+	POP(FP);
+	RETURN;
+L_zero_true:
+	MOV(R0, IMM(1002));
+	POP(FP);
+	RETURN;
+	
+L_string:
+	PUSH(FP);
+	MOV(FP, SP);
+	CMP(FPARG(1),IMM(1));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	CMP(INDD(R1,0), T_STRING);
+	JUMP_NE(L_string_false);
+	MOV(R0, IMM(1002));
+	POP(FP);
+	RETURN; 
+L_string_false:
+	MOV(R0, IMM(1004));
+	POP(FP);
+	RETURN; 
+	
+L_symbol:
+	PUSH(FP);
+	MOV(FP, SP);
+	CMP(FPARG(1),IMM(1));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	CMP(INDD(R1,0), T_SYMBOL);
+	JUMP_NE(L_symbol_false);
+	MOV(R0, IMM(1002));
+	POP(FP);
+	RETURN; 
+L_symbol_false:
+	MOV(R0, IMM(1004));
+	POP(FP);
+	RETURN; 
+	
+L_vector:
+	PUSH(FP);
+	MOV(FP, SP);
+	CMP(FPARG(1),IMM(1));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	CMP(INDD(R1,0), T_VECTOR);
+	JUMP_NE(L_vector_false);
+	MOV(R0, IMM(1002));
+	POP(FP);
+	RETURN; 
+L_vector_false:
+	MOV(R0, IMM(1004));
+	POP(FP);
+	RETURN; 
+
+L_char:
+	PUSH(FP);
+	MOV(FP, SP);
+	CMP(FPARG(1),IMM(1));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	CMP(INDD(R1,0), T_CHAR);
+	JUMP_NE(L_char_false);
+	MOV(R0, IMM(1002));
+	POP(FP);
+	RETURN; 
+L_char_false:
+	MOV(R0, IMM(1004));
+	POP(FP);
+	RETURN; 
+	
+L_proc:
+	PUSH(FP);
+	MOV(FP, SP);
+	CMP(FPARG(1),IMM(1));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	CMP(INDD(R1,0), T_CLOSURE);
+	JUMP_NE(L_proc_false);
+	MOV(R0, IMM(1002));
+	POP(FP);
+	RETURN; 
+L_proc_false:
+	MOV(R0, IMM(1004));
+	POP(FP);
+	RETURN; 
+	
+L_bool:
+	PUSH(FP);
+	MOV(FP, SP);
+	CMP(FPARG(1),IMM(1));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	CMP(INDD(R1,0), T_BOOL);
+	JUMP_NE(L_bool_false);
+	MOV(R0, IMM(1002));
+	POP(FP);
+	RETURN; 
+L_bool_false:
+	MOV(R0, IMM(1004));
+	POP(FP);
+	RETURN; 
+	
+L_integer:
+	PUSH(FP);
+	MOV(FP, SP);
+	CMP(FPARG(1),IMM(1));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	CMP(INDD(R1,0), T_INTEGER);
+	JUMP_NE(L_integer_false);
+	MOV(R0, IMM(1002));
+	POP(FP);
+	RETURN; 
+L_integer_false:
+	MOV(R0, IMM(1004));
+	POP(FP);
+	RETURN; 
+
+L_rational:
+L_number:
+	PUSH(FP);
+	MOV(FP, SP);
+	CMP(FPARG(1),IMM(1));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	CMP(INDD(R1,0), T_INTEGER);
+	JUMP_EQ(L_num_true);
+	CMP(INDD(R1,0), T_FRACTION);
+	JUMP_EQ(L_num_true);
+	MOV(R0, IMM(1004));
+	POP(FP);
+	RETURN; 
+L_num_true:
+	MOV(R0, IMM(1002));
+	POP(FP);
+	RETURN; 
+
+L_gcd: //result in R2
+	PUSH(FP);
+	MOV(FP, SP);
+	CMP(FPARG(1), IMM(0));
+	JUMP_LT(L_invalid_num_args);
+	MOV(R2, FPARG(3));
+	MOV(R3, FPARG(2));
+L_gcd_loop:
+	MOV(R4, R3);
+	MOV(R5, R3);
+	DIV(R4, R2);
+	REM(R5, R2);
+	CMP(R5, IMM(0));
+	JUMP_EQ(L_gcd_loop_end)
+	MOV(R3, R2);
+	MOV(R2, R5);
+	JUMP(L_gcd_loop);
+L_gcd_loop_end:
+	POP(FP);
+	RETURN;
+
+L_plus:
+	PUSH(FP);
+	MOV(FP, SP);
+	//PUSHA();
+	MOV(R1, FPARG(1)); //R1 - num of args
+	MOV(R0, IMM(0));
+	CMP(FPARG(1),IMM(0));
+	JUMP_EQ(L_plus_return_int_one);
+	CMP(FPARG(1),IMM(1));
+	JUMP_EQ(L_plus_one_arg);
+	MOV(R15, IMM(2)); //R2 - pointer to current arg
+	//R15 - counter of FPARG
+	MOV(R7, FPARG(R15)); //R7 - me
+	CMP(IND(R7), T_INTEGER);
+	JUMP_EQ(L_plus_make_int);
+	CMP(IND(R7), T_FRACTION);
+	JUMP_EQ(L_plus_make_fraction);
+
+	JUMP(L_invalid_types);
+L_plus_make_int:
+	MOV(R7, INDD(R7, 1)); //R7 - numerator
+	MOV(R8, IMM(1));      //R8 - denomerator
+	INCR(R15);
+	DECR(R1);
+	JUMP(L_plus_check);
+L_plus_make_fraction:
+	MOV(R8, INDD(R7, 2)); //R8 - denomerator
+	MOV(R7, INDD(R7, 1)); //R7 - numerator
+	INCR(R15);
+	DECR(R1);
+L_plus_check:
+	CMP(R1, IMM(0));
+	JUMP_EQ(L_plus_end);
+	MOV(R4, FPARG(R15)); //R4 - current arg
+	CMP(IND(R4), T_INTEGER);
+	JUMP_EQ(L_plus_next_int);
+	CMP(IND(R4), T_FRACTION);
+	JUMP_EQ(L_plus_next_fraction);
+	SHOW("HI", R7);
+	SHOW("HI", R15);
+	SHOW("HI", FPARG(R15));
+	SHOW("HI", FPARG(3));
+	SHOW("HI", R1);
+	SHOW("HI", R0);
+	SHOW("HI", IND(R7));
+	SHOW("HI", INDD(R7,1));
+	JUMP(L_invalid_types);
+L_plus_one_arg:
+	MOV(R0, FPARG(2));
+	JUMP(L_plus_final_exit);
+L_plus_next_int:
+	MOV(R14, INDD(R4, 1));
+	MUL(R14, R8);
+	ADD(R7, R14);
+	INCR(R15);
+	DECR(R1);
+	JUMP(L_plus_check);
+L_plus_next_fraction:
+	MOV(R14, INDD(R4, 1));
+	MOV(R13, INDD(R4, 2));
+	MUL(R14, R8);
+	MUL(R7, R13);
+	ADD(R7, R14);
+	MUL(R8, R13);
+	INCR(R15);
+	DECR(R1);
+	JUMP(L_plus_check);
+L_plus_end:
+	//check mudolo ==0
+	MOV(R11, R7);
+	REM(R11, R8);
+	CMP(R11, IMM(0));
+	JUMP_EQ(L_plus_return_int);
+	//check gcd
+	//PUSHAGCD();
+	PUSH(R8);
+	PUSH(R7);
+	PUSH(IMM(2));
+	PUSH(IMM(0));
+	CALL(L_gcd);
+	DROP(4);
+	//POPAGCD();
+	DIV(R7, R2);
+	DIV(R8, R2);
+	//check denum is negative
+	CMP(R8, IMM(0));
+	JUMP_LT(L_plus_plus_minus);
+L_plus_make_fraction1:
+	PUSH(R8);
+	PUSH(R7);
+	CALL(MAKE_SOB_FRACTION);
+	DROP(2);
+L_plus_final_exit:
+	//POPA();
+	POP(FP);
+	RETURN; 
+L_plus_plus_minus:
+	MUL(R7, IMM(-1));
+	MUL(R8, IMM(-1));
+	JUMP(L_plus_make_fraction1);
+L_plus_return_int:
+	DIV(R7, R8);
+	MOV(R0, R7);
+L_plus_return_int_one:
+	PUSH(R0);
+	CALL(MAKE_SOB_INTEGER);
+	DROP(1);
+	JUMP(L_plus_final_exit);
+	
+L_mul:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1)); //R1 - num of args
+	MOV(R0, IMM(1));
+	CMP(FPARG(1),IMM(0));
+	JUMP_EQ(L_mul_return_int_one);
+	CMP(FPARG(1),IMM(1));
+	JUMP_EQ(L_mul_one_arg);
+	MOV(R15, IMM(2)); //R2 - pointer to current arg
+	//R15 - counter of FPARG
+	MOV(R7, FPARG(R15)); //R7 - me
+	CMP(IND(R7), T_INTEGER);
+	JUMP_EQ(L_mul_make_int);
+	CMP(IND(R7), T_FRACTION);
+	JUMP_EQ(L_mul_make_fraction);
+	JUMP(L_invalid_types);
+L_mul_make_int:
+	MOV(R7, INDD(R7, 1)); //R7 - numerator
+	MOV(R8, IMM(1));      //R8 - denomerator
+	INCR(R15);
+	DECR(R1);
+	JUMP(L_mul_check);
+L_mul_make_fraction:
+	MOV(R8, INDD(R7, 2)); //R8 - denomerator
+	MOV(R7, INDD(R7, 1)); //R7 - numerator
+	INCR(R15);
+	DECR(R1);
+L_mul_check:
+	CMP(R1, IMM(0));
+	JUMP_EQ(L_mul_end);
+	MOV(R4, FPARG(R15)); //R4 - current arg
+	CMP(IND(R4), T_INTEGER);
+	JUMP_EQ(L_mul_next_int);
+	CMP(IND(R4), T_FRACTION);
+	JUMP_EQ(L_mul_next_fraction);
+	JUMP(L_invalid_types);
+L_mul_one_arg:
+	MOV(R0, FPARG(2));
+	JUMP(L_mul_final_exit);
+L_mul_next_int:
+	MUL(R7, INDD(R4, 1));
+	INCR(R15);
+	DECR(R1);
+	JUMP(L_mul_check);
+L_mul_next_fraction:
+	MUL(R7, INDD(R4, 1));
+	MUL(R8, INDD(R4, 2));
+	INCR(R15);
+	DECR(R1);
+	JUMP(L_mul_check);
+L_mul_end:
+	//check mudolo ==0
+	MOV(R11, R7);
+	REM(R11, R8);
+	CMP(R11, IMM(0));
+	JUMP_EQ(L_mul_return_int);
+	//check gcd
+	//PUSHAGCD();
+	PUSH(R8);
+	PUSH(R7);
+	PUSH(IMM(2));
+	PUSH(IMM(0));
+	CALL(L_gcd);
+	DROP(4);
+	//POPAGCD();
+	DIV(R7, R2);
+	DIV(R8, R2);
+	//check denum is negative
+	CMP(R8, IMM(0));
+	JUMP_LT(L_mul_mul_minus);
+L_mul_make_fraction1:
+	PUSH(R8);
+	PUSH(R7);
+	CALL(MAKE_SOB_FRACTION);
+	DROP(2);
+L_mul_final_exit:
+	POP(FP);
+	RETURN; 
+L_mul_mul_minus:
+	MUL(R7, IMM(-1));
+	MUL(R8, IMM(-1));
+	JUMP(L_mul_make_fraction1);
+L_mul_return_int:
+	DIV(R7, R8);
+	MOV(R0, R7);
+L_mul_return_int_one:
+	PUSH(R0);
+	CALL(MAKE_SOB_INTEGER);
+	DROP(1);
+	JUMP(L_mul_final_exit);
+	
+L_div:
+	PUSH(FP);
+	MOV(FP, SP);
+	MOV(R1, FPARG(1)); //R1 - num of args
+	CMP(R1,IMM(1));
+	JUMP_LT(L_invalid_num_args);
+	CMP(R1, IMM(1));
+	JUMP_EQ(L_div_one_arg);
+	MOV(R15, IMM(2)); //R15 - Counter fparg
+	//R15 - counter of FPARG
+	MOV(R7, FPARG(R15)); //R7 -  pointer to current arg
+	CMP(IND(R7), T_INTEGER);
+	JUMP_EQ(L_div_make_int);
+	CMP(IND(R7), T_FRACTION);
+	JUMP_EQ(L_div_make_fraction);
+	JUMP(L_invalid_types);
+L_div_make_int:
+	MOV(R7, INDD(R7, 1)); //R7 - numerator
+	MOV(R8, IMM(1));      //R8 - denomerator
+	INCR(R15);
+	DECR(R1);
+	JUMP(L_div_check);
+L_div_make_fraction:
+	MOV(R8, INDD(R7, 2)); //R8 - denomerator
+	MOV(R7, INDD(R7, 1)); //R7 - numerator
+	INCR(R15);
+	DECR(R1);
+L_div_check:
+	CMP(R1, IMM(0));
+	JUMP_EQ(L_div_end);
+	MOV(R4, FPARG(R15)); //R4 - current arg
+	CMP(IND(R4), T_INTEGER);
+	JUMP_EQ(L_div_next_int);
+	CMP(IND(R4), T_FRACTION);
+	JUMP_EQ(L_div_next_fraction);
+	JUMP(L_invalid_types);
+L_div_one_arg:
+	MOV(R0, FPARG(2));
+	CMP(IND(R0), T_INTEGER);
+	JUMP_EQ(L_div_one_arg_int);
+	CMP(IND(R0), T_FRACTION);
+	JUMP_EQ(L_div_one_arg_fraction);
+	JUMP(L_invalid_types);
+L_div_one_arg_int:
+	CMP(INDD(R0, 1), IMM(0));
+	JUMP_LT(L_div_one_int_neg);
+	CMP(INDD(R0, 1), IMM(1));
+	JUMP_EQ(L_div_final_exit);
+	MOV(R8, INDD(R0, 1));
+	MOV(R7, IMM(1));
+	PUSH(R8);
+	PUSH(R7);
+	CALL(MAKE_SOB_FRACTION);
+	DROP(2);
+	JUMP(L_div_final_exit);
+L_div_one_int_neg:
+	MOV(R7, IMM(-1));
+	MOV(R8, INDD(R0, 1));
+	MUL(R8, IMM(-1));
+	PUSH(R8);
+	PUSH(R7);
+	CALL(MAKE_SOB_FRACTION);
+	DROP(2);
+	JUMP(L_div_final_exit);
+L_div_one_arg_fraction:
+	MOV(R7, INDD(R0, 2));
+	MOV(R8, INDD(R0, 1));
+	JUMP(L_div_end);
+L_div_next_int:
+	CMP(INDD(R4, 1), IMM(0));
+	JUMP_EQ(L_divide_zero);
+	MUL(R8, INDD(R4, 1));
+	INCR(R15);
+	DECR(R1);
+	JUMP(L_div_check);
+L_div_next_fraction:
+	MUL(R7, INDD(R4, 2));
+	MUL(R8, INDD(R4, 1));
+	INCR(R15);
+	DECR(R1);
+	JUMP(L_div_check);
+L_div_end:
+	//check mudolo ==0
+	MOV(R11, R7);
+	REM(R11, R8);
+	CMP(R11, IMM(0));
+	JUMP_EQ(L_div_return_int);
+	//check gcd
+	//PUSHAGCD();
+	PUSH(R8);
+	PUSH(R7);
+	PUSH(IMM(2));
+	PUSH(IMM(0));
+	CALL(L_gcd);
+	DROP(4);
+	//POPAGCD();
+	DIV(R7, R2);
+	DIV(R8, R2);
+	//check denum is negative
+	CMP(R8, IMM(0));
+	JUMP_LT(L_div_div_minus);
+L_div_make_fraction1:
+	PUSH(R8);
+	PUSH(R7);
+	CALL(MAKE_SOB_FRACTION);
+	DROP(2);
+L_div_final_exit:
+	POP(FP);
+	RETURN; 
+L_div_div_minus:
+	MUL(R7, IMM(-1));
+	MUL(R8, IMM(-1));
+	JUMP(L_div_make_fraction1);
+L_div_return_int:
+	DIV(R7, R8);
+	MOV(R0, R7);
+L_div_return_int_one:
+	PUSH(R0);
+	CALL(MAKE_SOB_INTEGER);
+	DROP(1);
+	JUMP(L_div_final_exit);
+	
+L_sub:
+	PUSH(FP);
+	MOV(FP, SP);
+	//PUSHA();
+	MOV(R1, FPARG(1)); //R1 - num of args
+	CMP(R1, IMM(1));
+	JUMP_LT(L_invalid_num_args);
+	CMP(R1, IMM(1));
+	JUMP_EQ(L_sub_one_arg);
+	MOV(R15, IMM(2)); //R2 - pointer to current arg
+	//R15 - counter of FPARG
+	MOV(R7, FPARG(R15)); //R7 - me
+	CMP(IND(R7), T_INTEGER);
+	JUMP_EQ(L_sub_make_int);
+	CMP(IND(R7), T_FRACTION);
+	JUMP_EQ(L_sub_make_fraction);
+	JUMP(L_invalid_types);
+L_sub_make_int:
+	MOV(R7, INDD(R7, 1)); //R7 - numerator
+	MOV(R8, IMM(1));      //R8 - denomerator
+	INCR(R15);
+	DECR(R1);
+	JUMP(L_sub_check);
+L_sub_make_fraction:
+	MOV(R8, INDD(R7, 2)); //R8 - denomerator
+	MOV(R7, INDD(R7, 1)); //R7 - numerator
+	INCR(R15);
+	DECR(R1);
+L_sub_check:
+	CMP(R1, IMM(0));
+	JUMP_EQ(L_sub_end);
+	MOV(R4, FPARG(R15)); //R4 - current arg
+	CMP(IND(R4), T_INTEGER);
+	JUMP_EQ(L_sub_next_int);
+	CMP(IND(R4), T_FRACTION);
+	JUMP_EQ(L_sub_next_fraction);
+	JUMP(L_invalid_types);
+L_sub_one_arg:
+	MOV(R0, FPARG(2));
+	MOV(R6, IMM(0));
+	SUB(R6, INDD(R0, 1));
+	MOV(INDD(R0,1), R6);
+	JUMP(L_sub_final_exit);
+L_sub_next_int:
+	MOV(R14, INDD(R4, 1));
+	MUL(R14, R8);
+	SUB(R7, R14);
+	INCR(R15);
+	DECR(R1);
+	JUMP(L_sub_check);
+L_sub_next_fraction:
+	MOV(R14, INDD(R4, 1));
+	MOV(R13, INDD(R4, 2));
+	MUL(R14, R8);
+	MUL(R7, R13);
+	SUB(R7, R14);
+	MUL(R8, R13);
+	INCR(R15);
+	DECR(R1);
+	JUMP(L_sub_check);
+L_sub_end:
+	//check mudolo ==0
+	MOV(R11, R7);
+	REM(R11, R8);
+	CMP(R11, IMM(0));
+	JUMP_EQ(L_sub_return_int);
+	//check gcd
+	//PUSHAGCD();
+	PUSH(R8);
+	PUSH(R7);
+	PUSH(IMM(2));
+	PUSH(IMM(0));
+	CALL(L_gcd);
+	DROP(4);
+ 	//POPAGCD();
+	DIV(R7, R2);
+	DIV(R8, R2);
+	//check denum is negative
+	CMP(R8, IMM(0));
+	JUMP_LT(L_sub_sub_minus);
+L_sub_make_fraction1:
+	PUSH(R8);
+	PUSH(R7);
+	CALL(MAKE_SOB_FRACTION);
+	DROP(2);
+L_sub_final_exit:
+	//POPA();
+	POP(FP);
+	RETURN; 
+L_sub_sub_minus:
+	MUL(R7, IMM(-1));
+	MUL(R8, IMM(-1));
+	JUMP(L_sub_make_fraction1);
+L_sub_return_int:
+	DIV(R7, R8);
+	MOV(R0, R7);
+L_sub_return_int_one:
+	PUSH(R0);
+	CALL(MAKE_SOB_INTEGER);
+	DROP(1);
+	JUMP(L_sub_final_exit);
+	
+L_nil:
+	PUSH(FP);
+	MOV(FP, SP);
+	CMP(FPARG(1),IMM(1));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R0, FPARG(2));
+	CMP(INDD(R0,0), T_NIL);
+	JUMP_NE(L_nil_false);
+	MOV(R0, IMM(1002));
+	POP(FP);
+	RETURN; 
+L_nil_false:
+	MOV(R0, IMM(1004));
+	POP(FP);
+	RETURN; 
+
+L_pair:
+	PUSH(FP);
+	MOV(FP, SP);
+	CMP(FPARG(1),IMM(1));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R0, FPARG(2));
+	CMP(INDD(R0,0), T_PAIR);
+	JUMP_NE(L_pair_false);
+	MOV(R0, IMM(1002));
+	POP(FP);
+	RETURN; 
+L_pair_false:
+	MOV(R0, IMM(1004));
+	POP(FP);
+	RETURN; 
+
+L_car:
+	PUSH(FP);
+	MOV(FP, SP);
+	CMP(FPARG(1),IMM(1));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	CMP(INDD(R1,0), T_PAIR);
+	JUMP_NE(L_not_pair);
+	MOV(R0, INDD(R1,1));
+	POP(FP);
+	RETURN; 
+L_cdr:
+	PUSH(FP);
+	MOV(FP, SP);
+	CMP(FPARG(1),IMM(1));
+	JUMP_NE(L_invalid_num_args);
+	MOV(R1, FPARG(2));
+	CMP(INDD(R1,0), T_PAIR);
+	JUMP_NE(L_not_pair);
+	MOV(R0, INDD(R1,2));
+	POP(FP);
+	RETURN; 
+L_not_pair:
+	SHOW("Argument is not a pair", R0);
+        HALT;
+	
+L_cons:
+	PUSH(FP);
+	MOV(FP, SP);
+	CMP(FPARG(1),IMM(2));
+	JUMP_NE(L_invalid_num_args);
+	PUSH(FPARG(3));
+	PUSH(FPARG(2)); 
+	CALL(MAKE_SOB_PAIR);
+	DROP(2);
+	POP(FP);
+	RETURN; 
